@@ -1,0 +1,12 @@
+.app-shell { display: flex; min-height: 100vh; }
+.sidebar { display: flex; flex-direction: column; width: 258px; flex: 0 0 258px; min-height: 100vh; padding: 24px 16px; background: var(--color-sidebar); color: #f8fafc; }
+.brand { display: block; margin: 0 8px 34px; font-size: 1.08rem; font-weight: 700; line-height: 1.4; }
+.nav-section-label { margin: 0 10px 10px; color: #a8b3c7; font-size: .7rem; font-weight: 700; letter-spacing: .12em; }
+.sidebar-nav { display: grid; gap: 6px; }
+.sidebar-nav a { padding: 11px 12px; border-radius: 9px; color: #d7deeb; font-size: .92rem; transition: background .15s ease; }
+.sidebar-nav a:hover, .sidebar-nav a:focus-visible { background: #2b3850; color: #fff; outline: none; }
+.sidebar-note { margin: auto 8px 0; padding-top: 26px; color: #9ca8bc; font-size: .78rem; }
+.main-content { flex: 1; min-width: 0; padding: 32px; }
+.app-footer { padding: 22px 32px; color: var(--color-muted); font-size: .8rem; }
+@media (max-width: 800px) { .app-shell { flex-direction: column; } .sidebar { width: 100%; min-height: auto; flex-basis: auto; } .sidebar-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sidebar-note { margin-top: 20px; } .main-content { padding: 22px 16px; } .app-footer { padding: 18px 16px; } }
+@media (max-width: 460px) { .sidebar-nav { grid-template-columns: 1fr; } }
