@@ -26,9 +26,10 @@ return [
     ],
 
     'payment-reconciliation' => [
-        'title' => 'Phiếu thu và đối soát công nợ',
-        'view' => 'accounting/payment-reconciliation.php',
-    ],
+    'title'      => 'Báo cáo công nợ khách hàng',
+    'controller' => \App\Controllers\SalesReportController::class,
+    'action'     => 'index',
+],
 
     'stock-transfer' => [
         'title' => 'Lập phiếu chuyển kho',
