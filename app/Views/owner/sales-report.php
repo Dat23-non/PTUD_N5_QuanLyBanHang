@@ -1,15 +1,32 @@
-
 <?php
+// Dữ liệu bộ lọc.
 $fromDate = $fromDate ?? date('Y-m-01');
 $toDate = $toDate ?? date('Y-m-d');
-$reports = $reports ?? [];
-$error = $error ?? null;
-$employees = $employees ?? [];
 $employeeId = $employeeId ?? null;
+$areaId = $areaId ?? null;
 
-// Tính tổng doanh số và tổng số hóa đơn.
-$tongDoanhSo = array_sum(array_column($reports, 'doanh_so'));
-$tongHoaDon = array_sum(array_column($reports, 'so_hoa_don'));
+// Dữ liệu từ Controller.
+$employees = $employees ?? [];
+$areas = $areas ?? [];
+$reports = $reports ?? [];
+$invoiceDetails = $invoiceDetails ?? [];
+$error = $error ?? null;
+
+// Số liệu tổng hợp và đối chiếu.
+$totalRevenue = $totalRevenue ?? 0;
+$totalInvoices = $totalInvoices ?? 0;
+$detailRevenue = $detailRevenue ?? 0;
+$isReconciled = $isReconciled ?? false;
+
+// Hàm hiển thị dữ liệu an toàn.
+$escape = static function ($value): string {
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+};
+
+// Hàm định dạng tiền VNĐ.
+$formatMoney = static function ($value): string {
+    return number_format((float)$value, 0, ',', '.');
+};
 ?>
 
 <section class="page-header">
@@ -17,7 +34,8 @@ $tongHoaDon = array_sum(array_column($reports, 'so_hoa_don'));
         <p class="eyebrow">MANAGEMENT</p>
         <h1>Báo cáo doanh số theo nhân viên</h1>
         <p class="page-description">
-            Theo dõi doanh số từ các hóa đơn đã phát hành.
+            Theo dõi doanh số từ các hóa đơn đã phát hành,
+            lọc theo thời gian, nhân viên và khu vực bán hàng.
         </p>
     </div>
 </section>
@@ -26,38 +44,33 @@ $tongHoaDon = array_sum(array_column($reports, 'so_hoa_don'));
     <h2>Bộ lọc báo cáo</h2>
 
     <form class="filter-form" method="GET">
-
-        <!-- Giữ đúng trang báo cáo khi gửi bộ lọc -->
+        <!-- Giữ đúng trang báo cáo -->
         <input type="hidden" name="page" value="sales-report">
 
-        <!-- Lọc từ ngày -->
         <div>
             <label for="from-date">Từ ngày</label>
             <input
                 id="from-date"
                 type="date"
                 name="from_date"
-                value="<?= htmlspecialchars((string)$fromDate, ENT_QUOTES, 'UTF-8') ?>"
+                value="<?= $escape($fromDate) ?>"
                 required
             >
         </div>
 
-        <!-- Lọc đến ngày -->
         <div>
             <label for="to-date">Đến ngày</label>
             <input
                 id="to-date"
                 type="date"
                 name="to_date"
-                value="<?= htmlspecialchars((string)$toDate, ENT_QUOTES, 'UTF-8') ?>"
+                value="<?= $escape($toDate) ?>"
                 required
             >
         </div>
 
-        <!-- Lọc theo nhân viên bán hàng -->
         <div>
             <label for="employee-id">Nhân viên bán hàng</label>
-
             <select id="employee-id" name="employee_id">
                 <option value="">Tất cả nhân viên</option>
 
@@ -66,43 +79,59 @@ $tongHoaDon = array_sum(array_column($reports, 'so_hoa_don'));
                         value="<?= (int)$employee['nhan_vien_id'] ?>"
                         <?= $employeeId !== null
                             && (int)$employeeId === (int)$employee['nhan_vien_id']
-                            ? 'selected'
-                            : '' ?>
+                            ? 'selected' : '' ?>
                     >
-                        <?= htmlspecialchars(
-                            (string)$employee['ma_nhan_vien']
+                        <?= $escape(
+                            $employee['ma_nhan_vien']
                             . ' - '
-                            . (string)$employee['ho_ten'],
-                            ENT_QUOTES,
-                            'UTF-8'
+                            . $employee['ho_ten']
                         ) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
         </div>
 
-        <!-- Nút xem báo cáo -->
+        <!-- Bộ lọc khu vực mới -->
+        <div>
+            <label for="area-id">Khu vực bán hàng</label>
+            <select id="area-id" name="area_id">
+                <option value="">Tất cả khu vực</option>
+
+                <?php foreach ($areas as $area): ?>
+                    <option
+                        value="<?= (int)$area['khu_vuc_id'] ?>"
+                        <?= $areaId !== null
+                            && (int)$areaId === (int)$area['khu_vuc_id']
+                            ? 'selected' : '' ?>
+                    >
+                        <?= $escape(
+                            $area['ma_khu_vuc']
+                            . ' - '
+                            . $area['ten_khu_vuc']
+                        ) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
         <button class="button button-primary" type="submit">
             Xem báo cáo
         </button>
     </form>
 
-    <!-- Hiển thị thông báo lỗi -->
     <?php if ($error): ?>
         <div class="notice notice-info">
-            <?= htmlspecialchars((string)$error, ENT_QUOTES, 'UTF-8') ?>
+            <?= $escape($error) ?>
         </div>
 
-    <!-- Trường hợp không có dữ liệu -->
     <?php elseif (empty($reports)): ?>
         <div class="empty-state">
-            Không có hóa đơn đã phát hành trong khoảng thời gian
-            và nhân viên đã chọn.
+            Không có hóa đơn đã phát hành phù hợp với
+            khoảng thời gian, nhân viên và khu vực đã chọn.
         </div>
 
-    <!-- Hiển thị kết quả báo cáo -->
     <?php else: ?>
-        <h2>Kết quả báo cáo</h2>
+        <h2>Báo cáo tổng hợp theo nhân viên</h2>
 
         <div class="table-responsive">
             <table class="data-table">
@@ -120,69 +149,123 @@ $tongHoaDon = array_sum(array_column($reports, 'so_hoa_don'));
                     <?php foreach ($reports as $index => $report): ?>
                         <tr>
                             <td><?= $index + 1 ?></td>
-
+                            <td><?= $escape($report['ma_nhan_vien']) ?></td>
+                            <td><?= $escape($report['ho_ten']) ?></td>
                             <td>
-                                <?= htmlspecialchars(
-                                    (string)$report['ma_nhan_vien'],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>
+                                <?= (int)$report['so_hoa_don'] ?>
                             </td>
-
                             <td>
-                                <?= htmlspecialchars(
-                                    (string)$report['ho_ten'],
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>
-                            </td>
-
-                            <td>
-                                <?= number_format(
-                                    (float)$report['so_hoa_don'],
-                                    0,
-                                    ',',
-                                    '.'
-                                ) ?>
-                            </td>
-
-                            <td>
-                                <?= number_format(
-                                    (float)$report['doanh_so'],
-                                    0,
-                                    ',',
-                                    '.'
-                                ) ?>
+                                <?= $formatMoney($report['doanh_so']) ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
 
-                <!-- Tổng cộng -->
                 <tfoot>
                     <tr>
                         <th colspan="3">Tổng cộng</th>
-
-                        <th>
-                            <?= number_format(
-                                (float)$tongHoaDon,
-                                0,
-                                ',',
-                                '.'
-                            ) ?>
-                        </th>
-
-                        <th>
-                            <?= number_format(
-                                (float)$tongDoanhSo,
-                                0,
-                                ',',
-                                '.'
-                            ) ?>
-                        </th>
+                        <th><?= (int)$totalInvoices ?></th>
+                        <th><?= $formatMoney($totalRevenue) ?></th>
                     </tr>
                 </tfoot>
             </table>
         </div>
+
+        <h2>Chi tiết hóa đơn bán hàng</h2>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Số hóa đơn</th>
+                        <th>Ngày phát hành</th>
+                        <th>Nhân viên</th>
+                        <th>Khách hàng</th>
+                        <th>Khu vực</th>
+                        <th>Trạng thái</th>
+                        <th>Thành tiền (VNĐ)</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <?php foreach ($invoiceDetails as $index => $invoice): ?>
+                        <tr>
+                            <td><?= $index + 1 ?></td>
+                            <td><?= $escape($invoice['so_hoa_don']) ?></td>
+                            <td>
+                                <?= $escape($invoice['ngay_phat_hanh']) ?>
+                            </td>
+                            <td>
+                                <?= $escape(
+                                    $invoice['ma_nhan_vien']
+                                    . ' - '
+                                    . $invoice['ho_ten']
+                                ) ?>
+                            </td>
+                            <td>
+                                <?= $escape(
+                                    $invoice['ma_khach_hang']
+                                    . ' - '
+                                    . $invoice['ten_khach_hang']
+                                ) ?>
+                            </td>
+                            <td>
+                                <?= $escape($invoice['ten_khu_vuc'] ?? 'Chưa xác định') ?>
+                            </td>
+                            <td>
+                                <?= $escape($invoice['trang_thai']) ?>
+                            </td>
+                            <td>
+                                <?= $formatMoney($invoice['tong_thanh_toan']) ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <th colspan="7">Tổng doanh số chi tiết</th>
+                        <th><?= $formatMoney($detailRevenue) ?></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <h2>Đối chiếu doanh số</h2>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <tbody>
+                    <tr>
+                        <th>Tổng doanh số theo nhân viên</th>
+                        <td><?= $formatMoney($totalRevenue) ?> VNĐ</td>
+                    </tr>
+                    <tr>
+                        <th>Tổng doanh số theo hóa đơn</th>
+                        <td><?= $formatMoney($detailRevenue) ?> VNĐ</td>
+                    </tr>
+                    <tr>
+                        <th>Chênh lệch</th>
+                        <td>
+                            <?= $formatMoney(
+                                abs($totalRevenue - $detailRevenue)
+                            ) ?> VNĐ
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Kết quả đối chiếu</th>
+                        <td>
+                            <?php if ($isReconciled): ?>
+                                <strong>Khớp số liệu</strong>
+                            <?php else: ?>
+                                <strong>Có chênh lệch - cần rà soát</strong>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
     <?php endif; ?>
 </section>
