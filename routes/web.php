@@ -32,7 +32,8 @@ return [
 
     'stock-transfer' => [
         'title' => 'Lập phiếu chuyển kho',
-        'view' => 'warehouse/stock-transfer.php',
+        'controller' => App\Controllers\StockTransferController::class,
+        'action' => 'index',
     ],
 
     'sales-report' => [
