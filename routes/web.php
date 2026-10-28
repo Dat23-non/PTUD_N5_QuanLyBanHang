@@ -37,6 +37,8 @@ return [
 
     'sales-report' => [
         'title' => 'Báo cáo doanh số theo nhân viên',
+        'controller' => App\Controllers\SalesReportController::class,
+        'action' => 'index',
         'view' => 'owner/sales-report.php',
     ],
 
