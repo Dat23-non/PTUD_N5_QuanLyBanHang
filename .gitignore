@@ -1,5 +1,8 @@
 # Local configuration and secrets
 /config/database.php
+/config/stock-transfer.local.php
+/database/backups/
+/database/*.local.sql
 .env
 .env.*
 !.env.example

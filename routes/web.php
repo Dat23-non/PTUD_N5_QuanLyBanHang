@@ -32,11 +32,14 @@ return [
 
     'stock-transfer' => [
         'title' => 'Lập phiếu chuyển kho',
-        'view' => 'warehouse/stock-transfer.php',
+        'controller' => App\Controllers\StockTransferController::class,
+        'action' => 'index',
     ],
 
     'sales-report' => [
         'title' => 'Báo cáo doanh số theo nhân viên',
+        'controller' => App\Controllers\SalesReportController::class,
+        'action' => 'index',
         'view' => 'owner/sales-report.php',
     ],
 
