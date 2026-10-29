@@ -1,4 +1,6 @@
 .st-page { max-width: 1500px; margin: 0 auto; position: relative; }
+.st-status-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.st-status-tabs [aria-current="page"] { outline: 2px solid var(--color-primary); }
 /* Chỉ trang chuyển kho: đặt footer bên dưới nội dung trong layout dùng chung. */
 .app-shell:has(.st-page) { display: grid; grid-template-columns: 258px minmax(0, 1fr); }
 .app-shell:has(.st-page) > .sidebar { grid-row: 1 / 3; }

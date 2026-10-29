@@ -29,9 +29,4 @@ if (isset($_GET['test_actor'])) {
         $_SESSION['tai_khoan_id'] = (int) $_GET['test_actor'];
     }
 }
-if (isset($_GET['test_demo'])) {
-    if (isset($_GET['test_remote'])) { $_SERVER['REMOTE_ADDR'] = '192.0.2.1'; }
-    (new App\Controllers\StockTransferController(['demo_enabled' => $_GET['test_demo'] === '1']))->index();
-} else {
-    (new App\Core\Router())->dispatch(require $root . '/routes/web.php', 'dashboard');
-}
+(new App\Core\Router())->dispatch(require $root . '/routes/web.php', 'dashboard');

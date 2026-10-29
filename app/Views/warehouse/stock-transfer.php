@@ -36,30 +36,30 @@ $renderLine = static function (array $line, string $index) use ($products): void
             <h1><?= $transfer ? 'Chi tiết phiếu chuyển kho' : 'Lập phiếu chuyển kho' ?></h1>
             <p class="page-description">Điều chuyển hàng từ Kho tổng đến kho nhân viên bán hàng.</p>
         </div>
-        <span class="status-pill"><?= $transfer ? e(['NHAP' => 'Nháp', 'DA_XAC_NHAN' => 'Đã xác nhận', 'HUY' => 'Đã hủy'][$transfer['trang_thai']] ?? $transfer['trang_thai']) : 'Phiếu mới' ?></span>
+        <span class="status-pill"><?= $transfer ? e(['NHAP' => 'Nháp', 'DA_XAC_NHAN' => 'Đã duyệt', 'HUY' => 'Đã hủy'][$transfer['trang_thai']] ?? $transfer['trang_thai']) : 'Phiếu mới' ?></span>
     </section>
-    <?php if ($demoEnabled): ?>
-        <section class="notice notice-info st-demo" aria-label="Chế độ local">
-            <div><strong>Chế độ local · Chọn tài khoản</strong><br>
-                <?= $demoActive ? 'Đang dùng tài khoản thủ kho: ' . e($actor['ho_ten']) : 'Chọn tài khoản thủ kho để làm việc trên máy cá nhân.' ?></div>
-            <?php if (!$actor || $demoActive): ?>
-                <form method="post" action="index.php?page=stock-transfer" class="st-demo-form">
-                    <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
-                    <input type="hidden" name="operation" value="demo-actor">
-                    <label for="st-demo-actor" class="st-sr-only">Tài khoản thủ kho</label>
-                    <select name="demo_actor_id" id="st-demo-actor" required>
-                        <option value="">Chọn thủ kho</option>
-                        <?php foreach ($demoActors as $demoActor): ?>
-                            <option value="<?= e($demoActor['tai_khoan_id']) ?>" <?= (string) ($actor['tai_khoan_id'] ?? '') === (string) $demoActor['tai_khoan_id'] ? 'selected' : '' ?>><?= e($demoActor['ho_ten']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button class="button st-button-light" <?= !$demoActors ? 'disabled' : '' ?>>Dùng tài khoản</button>
-                </form>
-                <?php if (!$demoActors): ?><p>Chưa có tài khoản thủ kho đang hoạt động trong cơ sở dữ liệu.</p><?php endif; ?>
-            <?php endif; ?>
-        </section>
-    <?php endif; ?>
     <?php if ($error): ?><div class="notice st-error" role="alert"><?= e($error) ?></div><?php endif; ?>
+    <?php if ($actor): ?>
+    <section class="panel" id="st-list">
+        <div class="panel-heading"><h2>Phiếu chuyển kho</h2><a class="button button-primary" href="index.php?page=stock-transfer#st-form">+ Lập phiếu</a></div>
+        <nav class="st-status-tabs" aria-label="Lọc trạng thái phiếu">
+        <?php foreach ([''=>'Tất cả','NHAP'=>'Nháp','DA_XAC_NHAN'=>'Đã duyệt','HUY'=>'Đã hủy'] as $value=>$label): ?>
+            <a class="button st-button-light" <?= $statusFilter === $value ? 'aria-current="page"' : '' ?> href="index.php?page=stock-transfer&amp;status=<?= e($value) ?>#st-list"><?= e($label) ?></a>
+        <?php endforeach; ?>
+        </nav>
+        <?php if (!$transfers): ?><p class="empty-state">Chưa có phiếu trong trạng thái đã chọn.</p>
+        <?php else: ?>
+        <div class="table-wrap"><table><thead><tr><th>Mã phiếu</th><th>Ngày chuyển</th><th>Kho nhận</th><th>Người lập</th><th>Giá trị (đ)</th><th>Trạng thái</th><th></th></tr></thead><tbody>
+        <?php foreach ($transfers as $item): ?><tr>
+            <td><?= e($item['ma_chuyen_kho']) ?></td><td><?= e(date('d/m/Y', strtotime($item['ngay_chuyen']))) ?></td>
+            <td><?= e($item['kho_nhap']) ?></td><td><?= e($item['nguoi_lap']) ?></td><td class="st-number"><?= e($money($item['tong_gia_tri'])) ?></td>
+            <td><span class="status-pill"><?= e(['NHAP'=>'Nháp','DA_XAC_NHAN'=>'Đã duyệt','HUY'=>'Đã hủy'][$item['trang_thai']] ?? $item['trang_thai']) ?></span></td>
+            <td><a href="index.php?page=stock-transfer&amp;id=<?= e($item['phieu_chuyen_kho_id']) ?>">Xem phiếu</a></td>
+        </tr><?php endforeach; ?>
+        </tbody></table></div><p class="muted">Tối đa 200 phiếu gần nhất trong nhà phân phối.</p>
+        <?php endif; ?>
+    </section>
+    <?php endif; ?>
     <?php if ($transfer): ?>
         <?php if ($saved ?? false): ?><div class="notice st-success" role="status">Lưu nháp thành công. Phiếu và chi tiết đã được lưu; tồn hai kho chưa thay đổi.</div><?php endif; ?>
         <section class="panel">
@@ -121,6 +121,6 @@ $renderLine = static function (array $line, string $index) use ($products): void
         <noscript><div class="notice notice-info">Bật JavaScript để thêm nhiều dòng hàng và xem tổng tiền trước khi lưu. Server vẫn kiểm tra dữ liệu và tính tiền khi lưu.</div></noscript>
         <script src="assets/js/stock-transfer.js" defer></script>
     <?php else: ?>
-        <section class="panel"><h2>Chưa thể lập phiếu</h2><p class="muted">Cần tài khoản thủ kho hợp lệ và dữ liệu kho, hàng hóa được thiết lập trước khi lập phiếu.</p><a class="button st-button-light" href="index.php?page=dashboard">Về tổng quan</a></section>
+        <section class="panel"><h2>Chưa thể lập phiếu</h2><p class="muted">Cần tài khoản thủ kho hợp lệ và dữ liệu kho, hàng hóa được thiết lập trước khi lập phiếu.</p><a class="button button-primary" href="index.php?page=login">Đăng nhập</a></section>
     <?php endif; ?>
 </div>

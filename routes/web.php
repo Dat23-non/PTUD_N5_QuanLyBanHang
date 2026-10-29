@@ -17,7 +17,8 @@ return [
 
     'login' => [
         'title' => 'Đăng nhập',
-        'view' => 'auth/login.php',
+        'controller' => App\Controllers\AuthController::class,
+        'action' => 'index',
     ],
 
     'sales-order' => [

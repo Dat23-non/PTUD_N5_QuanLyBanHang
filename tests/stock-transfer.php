@@ -104,6 +104,7 @@ try {
             && $beforeDetails === $db->query('SELECT COUNT(*) FROM chi_tiet_phieu_chuyen_kho')->fetchColumn(), 'rollback header and first detail after second detail fails');
     }
     $db->exec('DROP TRIGGER test_fail_line');
+    $db->prepare('UPDATE tai_khoan SET mat_khau_hash=? WHERE tai_khoan_id=1')->execute([password_hash('test-password-2026',PASSWORD_DEFAULT)]);
     $httpStock = $db->query('SELECT * FROM ton_kho ORDER BY kho_id,hang_hoa_id')->fetchAll(PDO::FETCH_ASSOC);
 
     // HTTP kiểm tra route thật, session, CSRF, PRG và chống gửi lặp.
@@ -156,26 +157,56 @@ try {
         && $before === $db->query('SELECT COUNT(*) FROM phieu_chuyen_kho')->fetchColumn(), 'HTTP duplicate submit creates only one draft');
     $check($request($base . '&id=' . $id . '&test_actor=3')['status'] === 404, 'HTTP detail access limited to distributor');
     $check($request($base . '&id[]=1&test_actor=1')['status'] === 404, 'HTTP malformed detail id safely rejected');
-    $response = $request($base . '&test_actor=none&test_demo=0');
-    $check((require $root . '/config/stock-transfer.example.php')['demo_enabled'] === false
-        && !str_contains($response['raw'], 'name="demo_actor_id"'), 'demo selector disabled by default');
-    $response = $request($base . '&test_actor=none&test_demo=1');
-    $check(str_contains($response['raw'], 'name="demo_actor_id"'), 'explicit local demo displays real warehouse accounts');
-    preg_match('/name="csrf_token" value="([a-f0-9]+)"/', $response['raw'], $demoCsrf);
-    $demoPost = ['operation' => 'demo-actor', 'csrf_token' => $demoCsrf[1], 'demo_actor_id' => '2'];
-    $check($request($base . '&test_demo=1', $demoPost)['status'] === 422, 'demo cannot select sales account');
-    $demoPost['demo_actor_id'] = '1';
-    $check($request($base . '&test_demo=1', $demoPost)['status'] === 303, 'demo selects active warehouse account');
-    $response = $request($base . '&test_demo=1');
-    $check($response['status'] === 200 && str_contains($response['raw'], 'id="st-form"'), 'demo session opens form');
-    $check($request($base . '&test_demo=1&test_remote=1')['status'] === 401, 'demo denied for non-loopback requests');
-    $check($request($base . '&test_demo=0')['status'] === 401, 'demo session does not authenticate normal mode');
+    $response=$request($base.'&test_actor=1');
+    $check(str_contains($response['raw'],'id="st-list"') && str_contains($response['raw'],$draft['ma_chuyen_kho']), 'saved draft visible in warehouse list');
+    $check(!str_contains($response['raw'],'name="demo_actor_id"'), 'local actor selector removed');
+    $db->exec("UPDATE phieu_chuyen_kho SET trang_thai='DA_XAC_NHAN' WHERE phieu_chuyen_kho_id=".$id);
+    $response=$request($base.'&status=DA_XAC_NHAN');
+    $check(str_contains($response['raw'],$draft['ma_chuyen_kho']), 'confirmed transfer visible in approved filter');
+    $response=$request($base.'&status=NHAP');
+    $check(!str_contains($response['raw'],$draft['ma_chuyen_kho']), 'draft filter excludes approved transfer');
+    $db->exec("UPDATE phieu_chuyen_kho SET trang_thai='NHAP' WHERE phieu_chuyen_kho_id=".$id);
+    $check($model->listing(2)===[], 'list excludes other distributor');
+    $login='http://127.0.0.1:'.$port.'/index.php?page=login';
+    $response=$request($login.'&test_actor=none');
+    preg_match('/name="csrf_token" value="([a-f0-9]+)"/',$response['raw'],$authCsrf);
+    $credentials=['csrf_token'=>$authCsrf[1],'username'=>'test_warehouse','password'=>'incorrect'];
+    $check($request($login,$credentials)['status']===422, 'real login rejects incorrect password');
+    $credentials['password']='test-password-2026';
+    $check($request($login,$credentials)['status']===303, 'real login verifies password hash');
+    $response=$request($base);
+    $check($response['status']===200 && str_contains($response['raw'],'id="st-form"'),'shared login opens transfer without local settings');
+    preg_match('/name="csrf_token" value="([a-f0-9]+)"/',$response['raw'],$realCsrf);
+    preg_match('/name="submission_token" value="([a-f0-9]+)"/',$response['raw'],$realToken);
+    $realPost=$input+['operation'=>'save-draft','csrf_token'=>$realCsrf[1],'submission_token'=>$realToken[1]];
+    $beforeReal=(int)$db->query('SELECT COUNT(*) FROM phieu_chuyen_kho')->fetchColumn();
+    $check($request($base,$realPost)['status']===303 && (int)$db->query('SELECT COUNT(*) FROM phieu_chuyen_kho')->fetchColumn()===$beforeReal+1,
+        'real login saves persisted draft header and detail');
     $check($httpStock === $db->query('SELECT * FROM ton_kho ORDER BY kho_id,hang_hoa_id')->fetchAll(PDO::FETCH_ASSOC), 'stock unchanged after all HTTP saves');
     curl_close($curl);
     if (in_array('--browser', $argv, true)) {
         $browser = proc_open(['node', __DIR__ . '/stock-transfer-browser.mjs', $base], [0 => STDIN, 1 => STDOUT, 2 => STDERR], $unused, $root);
         if (proc_close($browser) !== 0) { throw new RuntimeException('Browser checks failed'); }
     }
+    $setup=new App\Services\StockTransferSetup($db);
+    $passwordBefore=$db->query('SELECT mat_khau_hash FROM tai_khoan WHERE tai_khoan_id=1')->fetchColumn();
+    $inventoryBefore=$db->query('SELECT * FROM ton_kho WHERE hang_hoa_id IN (1,2) ORDER BY kho_id,hang_hoa_id')->fetchAll(PDO::FETCH_ASSOC);
+    $check($setup->prepare('test_warehouse')===1, 'setup uses existing warehouse login');
+    $check($db->query('SELECT mat_khau_hash FROM tai_khoan WHERE tai_khoan_id=1')->fetchColumn()===$passwordBefore,
+        'setup preserves existing password');
+    $check($inventoryBefore===$db->query('SELECT * FROM ton_kho WHERE hang_hoa_id IN (1,2) ORDER BY kho_id,hang_hoa_id')->fetchAll(PDO::FETCH_ASSOC),
+        'setup preserves existing quantities and reserved stock');
+    $check(count($model->products(1))===14,'setup stocks catalog in actual account distributor');
+    $check($setup->prepare('test_other_warehouse')===3 && count($model->sourceWarehouses(2))===1,
+        'setup creates missing source warehouse for existing account');
+    $newActor=$setup->prepare('warehouse-new','new-password-2026','TEST_B');
+    $check((new App\Models\Account($db))->authenticate('warehouse-new','new-password-2026')===$newActor,
+        'setup new account can authenticate using password hash');
+    $countBefore=$db->query('SELECT COUNT(*) FROM ton_kho')->fetchColumn();
+    $setup->prepare('warehouse-new',null,'TEST_B');
+    $check($countBefore===$db->query('SELECT COUNT(*) FROM ton_kho')->fetchColumn(),'setup rerun does not duplicate stock');
+    try { $setup->prepare('test_sales'); throw new RuntimeException('Expected role rejection'); }
+    catch (DomainException $e) { $check(!$db->inTransaction(),'setup rejects non-warehouse account and rolls back'); }
     $seedProcess = static function () use ($root, $dbName): int {
         $child = proc_open([PHP_BINARY, __DIR__ . '/fixtures/stock-transfer-seed.php', '--seed'],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $seedPipes, $root,

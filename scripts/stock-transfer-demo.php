@@ -54,7 +54,7 @@ try {
         $db->exec($sql);
     }
     $db->commit();
-    echo "Dairy catalog and initial warehouse inventory are ready. Select Do Van Quang in local mode.\n";
+    echo "Legacy catalog seed completed. Use scripts/setup-stock-transfer.php for shared login setup.\n";
     echo "Existing stock quantities and transfer documents were preserved.\n";
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) { $db->rollBack(); }

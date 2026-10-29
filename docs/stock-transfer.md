@@ -10,38 +10,27 @@ Phạm vi UC: Kho tổng → kho NVBH cùng nhà phân phối; lưu phiếu và 
 
 Chức năng nhận tài khoản đăng nhập từ `$_SESSION['tai_khoan_id']`. Khi tích hợp đăng nhập, người phụ trách xác thực phải gán ID sau khi kiểm tra thông tin đăng nhập, không lấy ID từ query/form. Phía server kiểm tra lại tài khoản, nhân viên, nhóm `WAREHOUSE`, NPP còn hoạt động và giới hạn xem phiếu theo NPP. Không mặc định tài khoản đầu tiên hoặc dùng ID người lập do trình duyệt gửi.
 
-### Chế độ local (mặc định tắt)
+### Đăng nhập chung và khởi tạo máy mới
 
-Do chức năng đăng nhập chung còn là giao diện mẫu, có chế độ chọn một tài khoản thủ kho **có thật trong DB**. Chỉ bật trên máy cá nhân:
+Đã bỏ bộ chọn tài khoản local. File `config/stock-transfer.local.php` không còn được đọc. Dùng trang `index.php?page=login` với mật khẩu thật lưu dưới dạng hash trong DB. Phiên dùng khóa `tai_khoan_id` chung; người lập phiếu được lấy từ phiên này.
 
-```powershell
-Copy-Item config/stock-transfer.example.php config/stock-transfer.local.php
-```
-
-Sửa file local thành:
-
-```php
-<?php
-return ['demo_enabled' => true];
-```
-
-File local được Git bỏ qua. Selector chỉ xuất hiện khi cấu hình bật và địa chỉ kết nối trực tiếp là `127.0.0.1` hoặc `::1`; không đọc `X-Forwarded-For`. Không dùng chế độ này trên máy chủ triển khai hoặc phía sau reverse proxy. Phiên thử dùng khóa riêng `stock_transfer_demo_actor_id`, không đăng nhập vào các chức năng khác, và hết hiệu lực khi tắt chế độ thử. Tài khoản đăng nhập thật luôn được ưu tiên.
-
-Cần tài khoản thủ kho đang hoạt động, đúng một Kho tổng, ít nhất một kho `KHO_KY_GUI` gắn NVBH đang làm việc trong cùng NPP, hàng hóa/đơn vị và `ton_kho` tại Kho tổng. Có thể kiểm tra số lượng dữ liệu bằng:
+Sau khi pull/merge, bật MySQL và chạy trong thư mục dự án (đổi đường dẫn PHP theo máy):
 
 ```powershell
-& E:\xampp\php\php.exe scripts/stock-transfer-demo.php --check
+& E:\xampp\php\php.exe scripts/setup-stock-transfer.php test-warehouse
 ```
 
-Khởi tạo hoặc nâng cấp dữ liệu sản phẩm sữa:
+Nếu thiếu `config/database.php`, script tạo từ cấu hình example của XAMPP. MySQL có mật khẩu/cổng riêng thì chỉnh file local đó trước khi chạy. Database mới được tạo theo schema v1.1; database đã có được giữ nguyên, cần tương thích schema v1.1.
 
-```powershell
-& E:\xampp\php\php.exe scripts/stock-transfer-demo.php --seed
-```
+Tài khoản đã tồn tại: giữ mật khẩu và NPP, kiểm tra quyền thủ kho, bổ sung kho/danh mục/tồn đầu kỳ còn thiếu theo đúng NPP tài khoản. Tài khoản mới: nhập mật khẩu khi terminal yêu cầu. Nếu có nhiều NPP và tạo tài khoản mới, truyền mã NPP ở tham số thứ hai. Không ghi mật khẩu vào Git hoặc URL. Script không tự đăng nhập hay bỏ kiểm tra quyền.
 
-Lệnh này **ghi dữ liệu khởi tạo** vào database đã cấu hình: nhà phân phối A&D (giữ mã `ST_DEMO` để tương thích), thủ kho “Đỗ Văn Quang”, NVBH “Nguyễn Văn An”, hai kho, 3 nhà cung cấp và 12 sản phẩm sữa. Tồn đầu kỳ minh họa là 100 đơn vị nhỏ/mặt hàng ở kho tổng và 0 ở kho nhận, chỉ thêm nếu chưa có dòng tồn; chạy lại không đặt lại tồn hoặc giá đã chỉnh. Khi nâng cấp dữ liệu cũ, script đổi đúng các nhãn gốc chứa “thử”, ngừng sử dụng hai mặt hàng giữ chỗ và giữ nguyên ID/phiếu đã lập. Tài khoản local có hash mật khẩu ngẫu nhiên, không cung cấp mật khẩu đăng nhập; chỉ dùng selector local. Không import `tests/fixtures/stock-transfer.sql` vào DB ứng dụng vì fixture dùng ID cố định cho DB test riêng.
+Ví dụ: `php scripts/setup-stock-transfer.php test-warehouse NPP001`. Tồn đầu kỳ 100 chỉ thêm vào dòng chưa tồn tại, phục vụ đồ án; không thay thế chứng từ nhập hàng thực tế. Giá chuyển kho vẫn nhập trên từng dòng.
 
-Xem [hướng dẫn SQL, danh mục sữa và Git](dairy-data.md) để biết thứ tự import, cách bổ sung sản phẩm và các file cần commit/bỏ qua.
+### Danh sách và trạng thái
+
+Đầu tab Chuyển kho hiển thị tối đa 200 phiếu mới nhất trong NPP của tài khoản; có bộ lọc Tất cả/Nháp/Đã duyệt/Đã hủy và liên kết xem chi tiết. “Đã duyệt” hiển thị giá trị DB `DA_XAC_NHAN`; chưa có thao tác duyệt trong lần thay đổi này. Lưu nháp ghi header và detail trong transaction, redirect đến chi tiết, và phiếu xuất hiện lại trong danh sách sau khi tải trang.
+
+Các route `login` và `stock-transfer`, cùng liên kết đăng nhập ở sidebar, cần được người tích hợp review. Nếu dự án chung đã có AuthController khác, tích hợp session `tai_khoan_id` với hệ thống đó thay vì tạo cơ chế đăng nhập song song.
 
 ## Quyết định nghiệp vụ tạm thời
 

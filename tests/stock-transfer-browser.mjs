@@ -117,7 +117,7 @@ try {
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     await waitFor(() => evaluate('window.innerWidth === 390'), 'mobile viewport resized');
     check(await evaluate('document.documentElement.scrollWidth <= 390'), 'mobile has no page overflow');
-    check(await evaluate('document.querySelector(".table-wrap").scrollWidth > document.querySelector(".table-wrap").clientWidth'), 'mobile table scrolls inside panel');
+    check(await evaluate('document.querySelector("#st-form .table-wrap").scrollWidth > document.querySelector("#st-form .table-wrap").clientWidth'), 'mobile table scrolls inside panel');
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
     dialogAccept = true;
     await evaluate('document.querySelector("#st-save").click()');
