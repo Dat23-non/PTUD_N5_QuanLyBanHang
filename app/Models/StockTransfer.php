@@ -101,6 +101,20 @@ final class StockTransfer
         return $transfer;
     }
 
+    public function listing(int $distributorId, string $status = ''): array
+    {
+        $sql = 'SELECT p.phieu_chuyen_kho_id, p.ma_chuyen_kho, p.ngay_chuyen, p.tong_gia_tri,
+                p.trang_thai, x.ten_kho AS kho_xuat, k.ten_kho AS kho_nhap, n.ho_ten AS nguoi_lap
+            FROM phieu_chuyen_kho p JOIN kho x ON x.kho_id=p.kho_xuat_id
+            JOIN kho k ON k.kho_id=p.kho_nhap_id
+            JOIN tai_khoan a ON a.tai_khoan_id=p.nguoi_lap_tai_khoan_id
+            JOIN nhan_vien n ON n.nhan_vien_id=a.nhan_vien_id
+            WHERE x.nha_phan_phoi_id=? AND k.nha_phan_phoi_id=?';
+        $params = [$distributorId, $distributorId];
+        if ($status !== '') { $sql .= ' AND p.trang_thai=?'; $params[] = $status; }
+        return $this->all($sql . ' ORDER BY p.phieu_chuyen_kho_id DESC LIMIT 200', $params);
+    }
+
     private function all(string $sql, array $params): array
     {
         $stmt = $this->db->prepare($sql);

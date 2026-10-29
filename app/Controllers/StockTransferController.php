@@ -12,10 +12,6 @@ use Throwable;
 
 final class StockTransferController extends Controller
 {
-    public function __construct(private ?array $localConfig = null)
-    {
-    }
-
     public function index(): void
     {
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -24,15 +20,12 @@ final class StockTransferController extends Controller
             http_response_code(405);
             return;
         }
-        $configPath = dirname(__DIR__, 2) . '/config/stock-transfer.local.php';
-        $config = $this->localConfig ?? (is_file($configPath) ? require $configPath : []);
-        $demoEnabled = ($config['demo_enabled'] ?? false) === true
-            && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+        unset($_SESSION['stock_transfer_demo_actor_id']);
         $_SESSION['stock_transfer_csrf'] ??= bin2hex(random_bytes(32));
         $data = [
             'pageTitle' => 'Lập phiếu chuyển kho', 'actor' => null, 'source' => null,
-            'destinations' => [], 'products' => [], 'demoActors' => [], 'demoEnabled' => $demoEnabled,
-            'demoActive' => false, 'error' => null, 'transfer' => null,
+            'destinations' => [], 'products' => [], 'transfers' => [], 'statusFilter' => '',
+            'error' => null, 'transfer' => null,
             'csrf' => $_SESSION['stock_transfer_csrf'], 'submissionToken' => '',
             'form' => ['destination_id' => '', 'transfer_date' => date('Y-m-d'), 'note' => '',
                 'lines' => [['product_id' => '', 'quantity' => '', 'unit_price' => '']]],
@@ -52,29 +45,9 @@ final class StockTransferController extends Controller
             $db = Database::connection();
             $model = new StockTransfer($db);
             $sharedId = filter_var($_SESSION['tai_khoan_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-            if ($demoEnabled) {
-                $data['demoActors'] = $model->demoActors();
-            }
-            if ($method === 'POST' && ($_POST['operation'] ?? '') === 'demo-actor') {
-                if (!$demoEnabled || $sharedId) {
-                    http_response_code(403);
-                    $data['error'] = 'Không thể chọn tài khoản thử trong phiên này.';
-                    $this->view('warehouse/stock-transfer.php', $data);
-                    return;
-                }
-                $demoId = filter_var($_POST['demo_actor_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-                if (!$demoId || !$model->actor($demoId)) {
-                    throw new DomainException('Vui lòng chọn tài khoản thủ kho đang hoạt động.');
-                }
-                session_regenerate_id(true);
-                $_SESSION['stock_transfer_demo_actor_id'] = $demoId;
-                unset($_SESSION['stock_transfer_submissions']);
-                $this->go('index.php?page=stock-transfer');
-            }
-            $actorId = $sharedId ?: ($demoEnabled ? ($_SESSION['stock_transfer_demo_actor_id'] ?? null) : null);
+            $actorId = $sharedId;
             $actorId = filter_var($actorId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             $data['actor'] = $actorId ? $model->actor($actorId) : null;
-            $data['demoActive'] = !$sharedId && $demoEnabled && $data['actor'] !== null;
             if (!$data['actor']) {
                 http_response_code($actorId ? 403 : 401);
                 $data['error'] = $actorId
@@ -85,6 +58,12 @@ final class StockTransferController extends Controller
             }
 
             $distributorId = (int) $data['actor']['nha_phan_phoi_id'];
+            $status = $_GET['status'] ?? '';
+            if (!is_string($status) || !in_array($status, ['', 'NHAP', 'DA_XAC_NHAN', 'HUY'], true)) {
+                throw new DomainException('Trạng thái lọc không hợp lệ.');
+            }
+            $data['statusFilter'] = $status;
+            $data['transfers'] = $model->listing($distributorId, $status);
             $sources = $model->sourceWarehouses($distributorId);
             $data['source'] = count($sources) === 1 ? $sources[0] : null;
             $data['destinations'] = $model->destinations($distributorId);
@@ -114,7 +93,7 @@ final class StockTransferController extends Controller
                 } catch (Throwable $e) {
                     http_response_code(503);
                     $data['error'] = 'Không thể lưu phiếu chuyển kho. Dữ liệu đã nhập được giữ lại; vui lòng thử lưu lại.';
-                    error_log('StockTransfer save failed: ' . get_class($e) . ' (' . $e->getCode() . ')');
+                    error_log('StockTransfer save failed: ' . $e->getMessage());
                 }
                 // Tải lại tồn để người dùng có thể điều chỉnh sau lỗi tồn kho thay đổi.
                 $data['products'] = $data['source'] ? $model->products((int) $data['source']['kho_id']) : [];

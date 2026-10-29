@@ -8,7 +8,7 @@
         <a href="index.php?page=stock-transfer">Chuyển kho</a>
         <a href="index.php?page=sales-report">Báo cáo doanh số</a>
         <a href="index.php?page=role-permission">Phân quyền tài khoản</a>
-        <a href="index.php?page=login">Đăng nhập (mẫu)</a>
+        <a href="index.php?page=login"><?= isset($_SESSION['tai_khoan_id']) ? 'Tài khoản / Đăng xuất' : 'Đăng nhập' ?></a>
     </nav>
     <div class="sidebar-note">Bản khung phát triển · Chức năng đang được xây dựng</div>
 </aside>
